@@ -156,31 +156,50 @@ h1,h2,h3{ font-family: var(--font-display); margin: 0 0 12px; }
 /* ============ LEAD ROW ============ */
 .lead-list{ display:flex; flex-direction: column; gap: 8px; }
 .lead-row{
-  display:grid; grid-template-columns: 1.3fr 1.2fr .9fr 1fr 1fr auto; gap: 12px;
-  align-items:end; padding: 12px 18px; border-bottom: 1px solid var(--border);
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
   font-size: 13px;
 }
 .lead-row:last-child{ border-bottom: none; }
-.lead-row .name{ font-weight: 600; }
-.lead-row .company{ color: var(--muted); }
+.lead-row-info{
+  display:flex; align-items: baseline; gap: 16px; margin-bottom: 10px;
+}
+.lead-row-info .name{ font-weight: 600; white-space: nowrap; }
+.lead-row-info .company{ color: var(--muted); font-size: 12px; }
+.lead-row-info .motivo{
+  flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lead-row-controls{
+  display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items:end;
+}
 .lead-row select, .lead-row input[type="date"]{
   padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-family: var(--font-body);
   width: 100%;
 }
 .lead-row .btn-detail{
   border:1px solid var(--border); background: var(--bg); border-radius: 6px;
-  padding: 7px 10px; font-size:12px; cursor:pointer;
+  padding: 7px 10px; font-size:12px; cursor:pointer; white-space: nowrap;
 }
 .cell-label{
   display:block; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
   color: var(--muted); margin-bottom: 4px;
 }
 .list-header{
-  display:grid; grid-template-columns: 1.3fr 1.2fr .9fr 1fr 1fr auto; gap: 12px;
-  padding: 10px 18px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px;
+  padding: 8px 18px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
   color: var(--muted); border-bottom: 1px solid var(--border); background: var(--bg);
 }
-.fecha-ingreso{ font-family: var(--font-mono); font-size: 12px; }
+.fecha-ingreso{ font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.responsable{ color: var(--primary); font-weight: 600; }
+
+/* fila simple de una sola línea — usada en "Próximos contactos" */
+.simple-row{
+  display:grid; grid-template-columns: 1.3fr 1.2fr 1fr 1fr auto; gap: 12px;
+  align-items:center; padding: 12px 18px; border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.simple-row:last-child{ border-bottom: none; }
+.simple-row .name{ font-weight: 600; }
+.simple-row .company{ color: var(--muted); font-size: 12px; }
 .badge{ display:inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight:600; }
 .badge-Nuevo{ background:#E7EEEF; color: var(--primary); }
 .badge-Contactado{ background:#FCEFCF; color:#8A6600; }
@@ -190,7 +209,10 @@ h1,h2,h3{ font-family: var(--font-display); margin: 0 0 12px; }
 .overdue{ color: var(--danger); font-weight:600; }
 
 @media (max-width: 760px){
-  .lead-row{ grid-template-columns: 1fr 1fr; }
+  .lead-row-controls{ grid-template-columns: 1fr 1fr; }
+  .lead-row-info{ flex-wrap: wrap; }
+  .simple-row{ grid-template-columns: 1fr 1fr; }
+  .list-header{ display:none; }
 }
 
 /* ============ MODAL ============ */

@@ -71,6 +71,18 @@
 
       <!-- ============ RESUMEN ============ -->
       <section id="view-resumen" class="view active">
+        <div class="toolbar">
+          <select id="resumenRango">
+            <option value="todos">Todo el período</option>
+            <option value="7">Últimos 7 días</option>
+            <option value="14">Últimos 14 días</option>
+            <option value="30">Últimos 30 días</option>
+            <option value="custom">Personalizado</option>
+          </select>
+          <input id="resumenDesde" type="date" style="display:none;">
+          <span id="resumenHastaLabel" style="display:none; align-self:center; font-size:13px; color:var(--muted);">hasta</span>
+          <input id="resumenHasta" type="date" style="display:none;">
+        </div>
         <div class="grid-2">
           <div class="panel">
             <h2>Pipeline por etapa</h2>
@@ -84,6 +96,10 @@
         <div class="panel">
           <h2>Leads por semana</h2>
           <canvas id="chartTendencia" height="140"></canvas>
+        </div>
+        <div class="panel">
+          <h2>Leads por línea de producto y estado</h2>
+          <canvas id="chartLinea" height="180"></canvas>
         </div>
       </section>
 

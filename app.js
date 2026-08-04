@@ -9,6 +9,7 @@ const CONFIG = {
 };
 
 const ESTADOS = ['Nuevo', 'Contactado', 'Cotizado', 'Ganado', 'Perdido'];
+const RESPONSABLES = ['Anita', 'Tere', 'Cristián', 'Alejandro', 'Ricardo', 'Igor'];
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
 const state = {
@@ -16,7 +17,8 @@ const state = {
   filteredEstado: '',
   searchTerm: '',
   charts: {},
-  knownEmails: new Set() // para detectar leads nuevos entre refrescos
+  knownEmails: new Set(), // para detectar leads nuevos entre refrescos
+  resumenRange: { type: 'todos', from: null, to: null }
 };
 
 // ============================================================
@@ -74,6 +76,58 @@ function initNav() {
     state.filteredEstado = e.target.value;
     safeRender(renderCrmAccordion);
   });
+
+  document.getElementById('resumenRango').addEventListener('change', e => {
+    const custom = e.target.value === 'custom';
+    document.getElementById('resumenDesde').style.display = custom ? 'inline-block' : 'none';
+    document.getElementById('resumenHastaLabel').style.display = custom ? 'inline' : 'none';
+    document.getElementById('resumenHasta').style.display = custom ? 'inline-block' : 'none';
+    state.resumenRange.type = e.target.value;
+    renderResumen();
+  });
+  document.getElementById('resumenDesde').addEventListener('change', e => {
+    state.resumenRange.from = e.target.value;
+    renderResumen();
+  });
+  document.getElementById('resumenHasta').addEventListener('change', e => {
+    state.resumenRange.to = e.target.value;
+    renderResumen();
+  });
+}
+
+function renderResumen() {
+  safeRender(renderPipelineChart);
+  safeRender(renderProductoChart);
+  safeRender(renderTendenciaChart);
+  safeRender(renderLineaEstadoChart);
+}
+
+function getResumenRows() {
+  const range = state.resumenRange;
+  if (range.type === 'todos') return state.rows;
+
+  let from, to;
+  const now = new Date();
+  now.setHours(23, 59, 59, 999);
+
+  if (range.type === 'custom') {
+    from = range.from ? new Date(range.from) : null;
+    to = range.to ? new Date(range.to + 'T23:59:59') : now;
+  } else {
+    const days = Number(range.type);
+    from = new Date();
+    from.setDate(from.getDate() - days);
+    from.setHours(0, 0, 0, 0);
+    to = now;
+  }
+
+  return state.rows.filter(r => {
+    const d = new Date(r['date']);
+    if (isNaN(d)) return false;
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
 }
 
 // ============================================================
@@ -93,7 +147,6 @@ async function loadData({ isFirstLoad }) {
 
     if (!isFirstLoad) {
       const previousEmails = state.knownEmails;
-      const incomingEmails = new Set(data.rows.map(r => r['Correo electrónico'] || r['_row']));
       const newCount = data.rows.filter(r => !previousEmails.has(r['Correo electrónico'] || r['_row'])).length;
       if (newCount > 0) showNewLeadsBanner(newCount);
     }
@@ -113,6 +166,7 @@ function renderAll() {
   safeRender(renderPipelineChart);
   safeRender(renderProductoChart);
   safeRender(renderTendenciaChart);
+  safeRender(renderLineaEstadoChart);
   safeRender(renderCrmAccordion);
   safeRender(renderProximos);
   safeRender(renderInforme);
@@ -197,7 +251,8 @@ function renderKPIs() {
 // CHARTS
 // ============================================================
 function renderPipelineChart() {
-  const counts = ESTADOS.map(e => state.rows.filter(r => r['Estado'] === e).length);
+  const rows = getResumenRows();
+  const counts = ESTADOS.map(e => rows.filter(r => r['Estado'] === e).length);
   const ctx = document.getElementById('chartPipeline');
   if (state.charts.pipeline) state.charts.pipeline.destroy();
   state.charts.pipeline = new Chart(ctx, {
@@ -219,11 +274,13 @@ function renderPipelineChart() {
 }
 
 function renderProductoChart() {
+  const rows = getResumenRows();
   const buckets = {};
-  state.rows.forEach(r => {
+  rows.forEach(r => {
     const b = bucketProducto(r['Motivo consulta']);
     buckets[b] = (buckets[b] || 0) + 1;
   });
+  const total = rows.length;
   const ctx = document.getElementById('chartProducto');
   if (state.charts.producto) state.charts.producto.destroy();
   state.charts.producto = new Chart(ctx, {
@@ -235,13 +292,40 @@ function renderProductoChart() {
         backgroundColor: ['#1F4E5F', '#F2A900', '#2F8F5B', '#9AA9AD']
       }]
     },
-    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+    options: {
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: 12,
+            font: { size: 11 },
+            generateLabels: chart => {
+              const data = chart.data;
+              return data.labels.map((label, i) => {
+                const value = data.datasets[0].data[i];
+                return {
+                  text: `${label}  ${pct(value, total)}`,
+                  fillStyle: data.datasets[0].backgroundColor[i],
+                  index: i
+                };
+              });
+            }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.label}: ${ctx.parsed} (${pct(ctx.parsed, total)})`
+          }
+        }
+      }
+    }
   });
 }
 
 function renderTendenciaChart() {
+  const rows = getResumenRows();
   const weekMap = {};
-  state.rows.forEach(r => {
+  rows.forEach(r => {
     const d = new Date(r['date']);
     if (isNaN(d)) return;
     const weekStart = new Date(d);
@@ -269,6 +353,32 @@ function renderTendenciaChart() {
   });
 }
 
+function renderLineaEstadoChart() {
+  const rows = getResumenRows();
+  const lineas = ['Tuberías HDPE', 'Válvulas ASAHI', 'Geoceldas / Tekcell', 'Otros'];
+  const colores = { Nuevo: '#1F4E5F', Contactado: '#3C7E92', Cotizado: '#F2A900', Ganado: '#2F8F5B', Perdido: '#C23B22' };
+
+  const datasets = ESTADOS.map(estado => ({
+    label: estado,
+    backgroundColor: colores[estado],
+    data: lineas.map(linea => rows.filter(r => bucketProducto(r['Motivo consulta']) === linea && r['Estado'] === estado).length)
+  }));
+
+  const ctx = document.getElementById('chartLinea');
+  if (state.charts.linea) state.charts.linea.destroy();
+  state.charts.linea = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: lineas, datasets },
+    options: {
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+}
+
 // ============================================================
 // CRM — acordeón editable, agrupado por Estado
 // ============================================================
@@ -281,16 +391,9 @@ function matchesFilters(r) {
   return true;
 }
 
-function listHeaderHtml() {
-  return `<div class="list-header">
-    <span>Contacto</span><span>Motivo consulta</span><span>Ingresó</span>
-    <span>Estado</span><span>Próximo contacto</span><span></span>
-  </div>`;
-}
-
 function renderCrmAccordion() {
   const container = document.getElementById('crmAccordion');
-  container.innerHTML = listHeaderHtml();
+  container.innerHTML = '';
 
   ESTADOS.forEach(estado => {
     const group = state.rows.filter(r => (r['Estado'] || 'Nuevo') === estado).filter(matchesFilters);
@@ -310,7 +413,7 @@ function renderCrmAccordion() {
     if (group.length === 0) {
       body.innerHTML = '<p class="view-intro" style="padding:14px 18px;">Sin leads en este estado.</p>';
     } else {
-      group.slice(0, 200).forEach(r => body.appendChild(renderLeadRow(r)));
+      group.forEach(r => body.appendChild(renderLeadRow(r)));
     }
 
     groupEl.appendChild(header);
@@ -323,6 +426,35 @@ function renderLeadRow(r) {
   const row = document.createElement('div');
   row.className = 'lead-row';
 
+  const info = document.createElement('div');
+  info.className = 'lead-row-info';
+  info.innerHTML = `
+    <span class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</span>
+    <span class="company">${escapeHtml(r['Empresa'] || '')}</span>
+    <span class="motivo">${escapeHtml(r['Motivo consulta'] || '')}</span>
+    <span class="fecha-ingreso">${fmtDate(r['date'])}</span>
+  `;
+
+  const controls = document.createElement('div');
+  controls.className = 'lead-row-controls';
+
+  const respWrap = document.createElement('div');
+  respWrap.innerHTML = '<span class="cell-label">Responsable</span>';
+  const respSelect = document.createElement('select');
+  const blankOpt = document.createElement('option');
+  blankOpt.value = ''; blankOpt.textContent = 'Sin asignar';
+  respSelect.appendChild(blankOpt);
+  RESPONSABLES.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    if ((r['Responsable'] || '') === name) opt.selected = true;
+    respSelect.appendChild(opt);
+  });
+  respSelect.addEventListener('change', () => saveField(r, 'Responsable', respSelect.value, row));
+  respWrap.appendChild(respSelect);
+
+  const estadoWrap = document.createElement('div');
+  estadoWrap.innerHTML = '<span class="cell-label">Estado</span>';
   const estadoSelect = document.createElement('select');
   ESTADOS.forEach(e => {
     const opt = document.createElement('option');
@@ -330,33 +462,30 @@ function renderLeadRow(r) {
     if ((r['Estado'] || 'Nuevo') === e) opt.selected = true;
     estadoSelect.appendChild(opt);
   });
-  estadoSelect.addEventListener('change', () => {
-    saveField(r, 'Estado', estadoSelect.value, row);
-  });
+  estadoSelect.addEventListener('change', () => saveField(r, 'Estado', estadoSelect.value, row));
+  estadoWrap.appendChild(estadoSelect);
 
+  const dateWrap = document.createElement('div');
+  dateWrap.innerHTML = '<span class="cell-label">Próximo contacto</span>';
   const dateInput = document.createElement('input');
   dateInput.type = 'date';
   dateInput.value = toDateInputValue(r['Fecha próximo contacto']);
   dateInput.title = 'Próxima vez que hay que contactar a este lead';
-  dateInput.addEventListener('change', () => {
-    saveField(r, 'Fecha próximo contacto', dateInput.value, row);
-  });
+  dateInput.addEventListener('change', () => saveField(r, 'Fecha próximo contacto', dateInput.value, row));
+  dateWrap.appendChild(dateInput);
 
   const detailBtn = document.createElement('button');
   detailBtn.className = 'btn-detail';
   detailBtn.textContent = 'Ver detalle';
   detailBtn.addEventListener('click', () => openModal(r));
 
-  row.innerHTML = `
-    <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}</div></div>
-    <div>${escapeHtml((r['Motivo consulta'] || '').slice(0, 60))}${(r['Motivo consulta'] || '').length > 60 ? '…' : ''}</div>
-    <div class="fecha-ingreso">${fmtDate(r['date'])}</div>
-    <div><span class="cell-label">Estado</span></div>
-    <div><span class="cell-label">Próximo contacto</span></div>
-  `;
-  row.children[3].appendChild(estadoSelect);
-  row.children[4].appendChild(dateInput);
-  row.appendChild(detailBtn);
+  controls.appendChild(respWrap);
+  controls.appendChild(estadoWrap);
+  controls.appendChild(dateWrap);
+  controls.appendChild(detailBtn);
+
+  row.appendChild(info);
+  row.appendChild(controls);
 
   return row;
 }
@@ -384,18 +513,16 @@ function renderProximos() {
   }
 
   const headerEl = document.createElement('div');
-  headerEl.className = 'list-header';
-  headerEl.style.gridTemplateColumns = '1.3fr 1.2fr 1fr 1fr auto';
+  headerEl.className = 'list-header simple-row';
   headerEl.innerHTML = '<span>Contacto</span><span>Motivo consulta</span><span>Próximo contacto</span><span>Estado</span><span></span>';
   container.appendChild(headerEl);
 
   rows.forEach(r => {
     const row = document.createElement('div');
-    row.className = 'lead-row';
-    row.style.gridTemplateColumns = '1.3fr 1.2fr 1fr 1fr auto';
+    row.className = 'simple-row';
     const overdue = isOverdue(r['Fecha próximo contacto']);
     row.innerHTML = `
-      <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}</div></div>
+      <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}${r['Responsable'] ? ' · <span class="responsable">' + escapeHtml(r['Responsable']) + '</span>' : ''}</div></div>
       <div>${escapeHtml((r['Motivo consulta'] || '').slice(0, 60))}</div>
       <div class="${overdue ? 'overdue' : ''}">${overdue ? '⚠ Vencido: ' : ''}${fmtDate(r['Fecha próximo contacto'])}</div>
       <div><span class="badge badge-${r['Estado'] || 'Nuevo'}">${r['Estado'] || 'Nuevo'}</span></div>
@@ -437,6 +564,7 @@ const MODAL_FIELDS = [
   { key: 'date', label: 'Fecha de ingreso', editable: false, formatDate: true },
   { key: 'Nombre', editable: true },
   { key: 'Empresa', editable: true },
+  { key: 'Responsable', editable: true, select: RESPONSABLES },
   { key: 'Correo electrónico', editable: true },
   { key: 'Teléfono', editable: true },
   { key: 'Motivo consulta', editable: false },
@@ -455,8 +583,20 @@ function openModal(row) {
     wrap.className = 'field-row' + (f.editable ? '' : ' readonly');
     const label = document.createElement('label');
     label.textContent = f.label || f.key;
-    const input = document.createElement(f.textarea ? 'textarea' : 'input');
-    input.value = f.formatDate ? fmtDate(row[f.key]) : (row[f.key] || '');
+    const input = document.createElement(f.select ? 'select' : (f.textarea ? 'textarea' : 'input'));
+    if (f.select) {
+      const blank = document.createElement('option');
+      blank.value = ''; blank.textContent = 'Sin asignar';
+      input.appendChild(blank);
+      f.select.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt; o.textContent = opt;
+        if ((row[f.key] || '') === opt) o.selected = true;
+        input.appendChild(o);
+      });
+    } else {
+      input.value = f.formatDate ? fmtDate(row[f.key]) : (row[f.key] || '');
+    }
     input.dataset.field = f.key;
     if (!f.editable) input.readOnly = true;
     wrap.appendChild(label);
