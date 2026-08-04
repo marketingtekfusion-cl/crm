@@ -643,7 +643,19 @@ function renderLeadRow(r) {
   dateInput.type = 'date';
   dateInput.value = toDateInputValue(r['Fecha próximo contacto']);
   dateInput.title = 'Próxima vez que hay que contactar a este lead';
-  dateInput.addEventListener('change', () => saveField(r, 'Fecha próximo contacto', dateInput.value, row));
+  dateInput.addEventListener('change', () => {
+    const val = dateInput.value;
+    if (val) {
+      const m = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const year = m ? Number(m[1]) : NaN;
+      if (!m || year < 2020 || year > 2100) {
+        dateInput.style.outline = '2px solid #B3261E';
+        return; // fecha incompleta o con año imposible: no se manda a guardar
+      }
+    }
+    dateInput.style.outline = '';
+    saveField(r, 'Fecha próximo contacto', val, row);
+  });
   dateWrap.appendChild(dateInput);
 
   const detailBtn = document.createElement('button');
@@ -875,6 +887,8 @@ async function saveField(row, field, value, rowEl, recordUndo = true) {
         alert('Esta fila cambió en el Sheet desde que se cargó el dashboard. Recarga la página antes de seguir editando.');
       } else if (data.error === 'column_not_found') {
         alert(`No se pudo guardar "${field}": esa columna todavía no existe en el Sheet. Agrégala con ese nombre exacto y vuelve a intentar.`);
+      } else if (data.error === 'invalid_date') {
+        alert('Esa fecha no parece válida (año fuera de rango). Revisa el campo e intenta de nuevo.');
       } else if (data.error === 'unauthorized') {
         alert('No se pudo guardar: la clave de escritura no coincide entre el dashboard y Apps Script (WRITE_TOKEN).');
       } else {
