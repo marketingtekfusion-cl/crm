@@ -19,6 +19,7 @@ const state = {
   charts: {},
   knownEmails: new Set(), // para detectar leads nuevos entre refrescos
   openGroups: new Set(), // qué grupos del acordeón del CRM están expandidos
+  highlightEmails: null, // set de emails a mostrar en exclusiva (venidos del aviso de leads nuevos)
   resumenRange: { type: 'todos', from: null, to: null }
 };
 
@@ -148,8 +149,10 @@ async function loadData({ isFirstLoad }) {
 
     if (!isFirstLoad) {
       const previousEmails = state.knownEmails;
-      const newCount = data.rows.filter(r => !previousEmails.has(r['Correo electrónico'] || r['_row'])).length;
-      if (newCount > 0) showNewLeadsBanner(newCount);
+      const newRows = data.rows.filter(r => !previousEmails.has(r['Correo electrónico'] || r['_row']));
+      if (newRows.length > 0) {
+        showNewLeadsBanner(newRows.length, newRows.map(r => r['Correo electrónico'] || r['_row']));
+      }
     }
 
     state.rows = data.rows;
@@ -173,13 +176,44 @@ function renderAll() {
   safeRender(renderInforme);
 }
 
-function showNewLeadsBanner(count) {
+function showNewLeadsBanner(count, emails) {
   const banner = document.getElementById('newLeadsBanner');
   const text = document.getElementById('newLeadsText');
   text.textContent = count === 1
-    ? '📥 Llegó 1 lead nuevo desde que abriste el dashboard.'
-    : `📥 Llegaron ${count} leads nuevos desde que abriste el dashboard.`;
+    ? '📥 Llegó 1 lead nuevo desde que abriste el dashboard. Clic para verlo →'
+    : `📥 Llegaron ${count} leads nuevos desde que abriste el dashboard. Clic para verlos →`;
   banner.style.display = 'flex';
+  banner.dataset.emails = JSON.stringify(emails || []);
+}
+
+function goToNewLeads() {
+  const banner = document.getElementById('newLeadsBanner');
+  const emails = JSON.parse(banner.dataset.emails || '[]');
+  if (emails.length === 0) return;
+
+  state.highlightEmails = new Set(emails);
+  state.searchTerm = '';
+  state.filteredEstado = '';
+  document.getElementById('crmSearch').value = '';
+  document.getElementById('crmFilterEstado').value = '';
+
+  // abrir los grupos donde están esos leads
+  state.rows.forEach(r => {
+    const key = r['Correo electrónico'] || r['_row'];
+    if (state.highlightEmails.has(key)) state.openGroups.add(r['Estado'] || 'Nuevo');
+  });
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelector('.tab-btn[data-view="crm"]').classList.add('active');
+  document.getElementById('view-crm').classList.add('active');
+
+  safeRender(renderCrmAccordion);
+  banner.style.display = 'none';
+  document.getElementById('highlightBanner').style.display = 'flex';
+
+  const firstHighlighted = document.querySelector('.lead-row.highlighted');
+  if (firstHighlighted) firstHighlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function safeRender(fn) {
@@ -384,6 +418,10 @@ function renderLineaEstadoChart() {
 // CRM — acordeón editable, agrupado por Estado
 // ============================================================
 function matchesFilters(r) {
+  if (state.highlightEmails) {
+    const key = r['Correo electrónico'] || r['_row'];
+    return state.highlightEmails.has(key);
+  }
   if (state.filteredEstado && r['Estado'] !== state.filteredEstado) return false;
   if (state.searchTerm) {
     const haystack = [r['Nombre'], r['Empresa'], r['Motivo consulta']].join(' ').toLowerCase();
@@ -431,6 +469,8 @@ function renderCrmAccordion() {
 function renderLeadRow(r) {
   const row = document.createElement('div');
   row.className = 'lead-row';
+  const key = r['Correo electrónico'] || r['_row'];
+  if (state.highlightEmails && state.highlightEmails.has(key)) row.classList.add('highlighted');
 
   const info = document.createElement('div');
   info.className = 'lead-row-info';
@@ -623,8 +663,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initLock();
   initNav();
 
-  document.getElementById('newLeadsDismiss').addEventListener('click', () => {
+  document.getElementById('newLeadsBanner').addEventListener('click', goToNewLeads);
+  document.getElementById('newLeadsDismiss').addEventListener('click', (e) => {
+    e.stopPropagation();
     document.getElementById('newLeadsBanner').style.display = 'none';
+  });
+
+  document.getElementById('highlightClear').addEventListener('click', () => {
+    state.highlightEmails = null;
+    document.getElementById('highlightBanner').style.display = 'none';
+    safeRender(renderCrmAccordion);
   });
 
   document.getElementById('refreshBtn').addEventListener('click', async () => {

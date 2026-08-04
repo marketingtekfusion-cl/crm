@@ -118,11 +118,27 @@ h1,h2,h3{ font-family: var(--font-display); margin: 0 0 12px; }
   align-items:center; justify-content: space-between;
   background: #FDECDC; border: 1px solid #F3B685; color: #9A4300;
   border-radius: var(--radius); padding: 12px 18px; margin-bottom: 16px;
-  font-size: 13px; font-weight: 600;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: box-shadow .15s ease;
 }
+.new-leads-banner:hover{ box-shadow: var(--shadow-sm); }
 .new-leads-banner button{
   background:none; border: 1px solid #9A4300; color:#9A4300;
   border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor:pointer;
+}
+
+.highlight-banner{
+  display:none;
+  align-items:center; justify-content: space-between;
+  background: #E4ECF6; border: 1px solid #B7CCE6; color: var(--primary);
+  border-radius: var(--radius); padding: 10px 16px; margin-bottom: 14px;
+  font-size: 13px; font-weight: 600;
+}
+.highlight-banner button{
+  background: var(--primary); border: none; color:#fff;
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor:pointer; font-weight:600;
+}
+.lead-row.highlighted{
+  background: #FDF6EC; box-shadow: inset 3px 0 0 var(--accent);
 }
 
 /* ============ PANELS / VIEWS ============ */
