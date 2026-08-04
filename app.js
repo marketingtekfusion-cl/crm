@@ -262,7 +262,7 @@ function renderPipelineChart() {
       labels: ESTADOS,
       datasets: [{
         data: counts,
-        backgroundColor: ['#1F4E5F', '#3C7E92', '#F2A900', '#2F8F5B', '#C23B22'],
+        backgroundColor: ['#044A92', '#1D6FB8', '#ED6801', '#2F8F5B', '#B3261E'],
         borderRadius: 4
       }]
     },
@@ -290,7 +290,7 @@ function renderProductoChart() {
       labels: Object.keys(buckets),
       datasets: [{
         data: Object.values(buckets),
-        backgroundColor: ['#1F4E5F', '#F2A900', '#2F8F5B', '#9AA9AD']
+        backgroundColor: ['#044A92', '#ED6801', '#2F8F5B', '#9AA9AD']
       }]
     },
     options: {
@@ -343,8 +343,8 @@ function renderTendenciaChart() {
       labels: keys.map(k => fmtDate(k)),
       datasets: [{
         data: keys.map(k => weekMap[k]),
-        borderColor: '#1F4E5F',
-        backgroundColor: 'rgba(31,78,95,.08)',
+        borderColor: '#044A92',
+        backgroundColor: 'rgba(4,74,146,.08)',
         fill: true,
         tension: .3,
         pointRadius: 2
@@ -357,7 +357,7 @@ function renderTendenciaChart() {
 function renderLineaEstadoChart() {
   const rows = getResumenRows();
   const lineas = ['Tuberías HDPE', 'Válvulas ASAHI', 'Geoceldas / Tekcell', 'Otros'];
-  const colores = { Nuevo: '#1F4E5F', Contactado: '#3C7E92', Cotizado: '#F2A900', Ganado: '#2F8F5B', Perdido: '#C23B22' };
+  const colores = { Nuevo: '#044A92', Contactado: '#1D6FB8', Cotizado: '#ED6801', Ganado: '#2F8F5B', Perdido: '#B3261E' };
 
   const datasets = ESTADOS.map(estado => ({
     label: estado,
@@ -678,7 +678,7 @@ async function saveField(row, field, value, rowEl) {
     const data = await res.json();
     if (!data.ok) {
       console.error('Error al guardar', data.error);
-      if (rowEl) rowEl.style.outline = '2px solid #C23B22';
+      if (rowEl) rowEl.style.outline = '2px solid #B3261E';
       if (data.error === 'row_changed') {
         alert('Esta fila cambió en el Sheet desde que se cargó el dashboard. Recarga la página antes de seguir editando.');
       }
@@ -698,7 +698,7 @@ async function saveField(row, field, value, rowEl) {
     return true;
   } catch (err) {
     console.error(err);
-    if (rowEl) rowEl.style.outline = '2px solid #C23B22';
+    if (rowEl) rowEl.style.outline = '2px solid #B3261E';
     return false;
   }
 }
