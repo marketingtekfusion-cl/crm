@@ -176,8 +176,8 @@ h1,h2,h3{ font-family: var(--font-display); margin: 0 0 12px; }
 .accordion-header:hover{ background: var(--bg); }
 .accordion-header .count{ font-family: var(--font-mono); color: var(--muted); font-size: 13px; }
 .accordion-body{ display:none; border-top: 1px dashed var(--border); }
-.accordion-group.open .accordion-body{ display:block; }
-.accordion-group.open .chev{ transform: rotate(90deg); }
+.accordion-group.open > .accordion-body{ display:block; }
+.accordion-group.open > .accordion-header .chev{ transform: rotate(90deg); }
 .chev{ transition: transform .15s ease; display:inline-block; margin-left: 8px; }
 
 /* ============ LEAD ROW ============ */
