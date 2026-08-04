@@ -238,7 +238,13 @@ h1,h2,h3{ font-family: var(--font-display); margin: 0 0 12px; }
 .badge-Cotizado{ background:#FDEBDD; color: var(--accent); }
 .badge-Ganado{ background:#E1F3E8; color: var(--success); }
 .badge-Perdido{ background:#FBE1DE; color: var(--danger); }
+.badge-Archivado{ background:#E9EBEC; color: var(--muted); }
 .overdue{ color: var(--danger); font-weight:600; }
+
+/* sub-acordeón de meses dentro de "Archivado" */
+.archive-months{ padding: 8px 18px 14px; display:flex; flex-direction:column; gap:8px; }
+.archive-months .accordion-group{ box-shadow:none; border-color: var(--border); }
+.archive-months .accordion-header{ padding: 11px 16px; border-left-color: var(--muted); font-size: 13px; }
 
 @media (max-width: 760px){
   .lead-row-controls{ grid-template-columns: 1fr 1fr; }

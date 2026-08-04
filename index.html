@@ -6,7 +6,7 @@
 <title>CRM Tekfusion</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -117,7 +117,9 @@
             <option value="Cotizado">Cotizado</option>
             <option value="Ganado">Ganado</option>
             <option value="Perdido">Perdido</option>
+            <option value="Archivado">Archivado</option>
           </select>
+          <button id="sortToggle" class="btn-refresh" type="button">Fecha ingreso: más antiguo primero ↓</button>
         </div>
         <div id="highlightBanner" class="highlight-banner">
           <span>👀 Mostrando solo los leads nuevos que llegaron recién.</span>
@@ -142,6 +144,7 @@
             <dt>Cotizado</dt><dd>Se envió una cotización formal y está pendiente de respuesta.</dd>
             <dt>Ganado</dt><dd>Negocio cerrado y confirmado.</dd>
             <dt>Perdido</dt><dd>El negocio no se concretó. Revisa "Motivo pérdida" y "Detalle pérdida" para el detalle.</dd>
+            <dt>Archivado</dt><dd>No es un estado que se elige — es automático. Agrupa los leads que llevan más de 14 días marcados como "Nuevo" sin que nadie los haya contactado. Apenas cambias su Estado a cualquier otra cosa, sale de "Archivado" solo.</dd>
           </dl>
         </div>
       </section>
@@ -173,6 +176,6 @@
   </div>
 
   <script src="chart.umd.js"></script>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ const CONFIG = {
 const ESTADOS = ['Nuevo', 'Contactado', 'Cotizado', 'Ganado', 'Perdido'];
 const RESPONSABLES = ['Anita', 'Tere', 'Cristián', 'Alejandro', 'Ricardo', 'Igor'];
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
+const ARCHIVE_AFTER_DAYS = 14; // días como "Nuevo" sin contactar antes de archivarse
 
 const state = {
   rows: [],
@@ -20,6 +21,8 @@ const state = {
   knownEmails: new Set(), // para detectar leads nuevos entre refrescos
   openGroups: new Set(), // qué grupos del acordeón del CRM están expandidos
   highlightEmails: null, // set de emails a mostrar en exclusiva (venidos del aviso de leads nuevos)
+  sortOrder: 'asc', // 'asc' = más antiguo primero, 'desc' = más nuevo primero
+  openArchiveMonths: new Set(),
   resumenRange: { type: 'todos', from: null, to: null }
 };
 
@@ -76,6 +79,15 @@ function initNav() {
   });
   document.getElementById('crmFilterEstado').addEventListener('change', e => {
     state.filteredEstado = e.target.value;
+    safeRender(renderCrmAccordion);
+  });
+
+  document.getElementById('sortToggle').addEventListener('click', () => {
+    state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+    const btn = document.getElementById('sortToggle');
+    btn.textContent = state.sortOrder === 'asc'
+      ? 'Fecha ingreso: más antiguo primero ↓'
+      : 'Fecha ingreso: más nuevo primero ↑';
     safeRender(renderCrmAccordion);
   });
 
@@ -234,6 +246,49 @@ function bucketProducto(motivo) {
   if (m.includes('asahi') || m.includes('válvula') || m.includes('valvula')) return 'Válvulas ASAHI';
   if (m.includes('geocelda') || m.includes('tekcell') || m.includes('geosint')) return 'Geoceldas / Tekcell';
   return 'Otros';
+}
+
+function daysSince(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return Math.floor((today - d) / 86400000);
+}
+
+function isArchived(r) {
+  return (r['Estado'] || 'Nuevo') === 'Nuevo' && daysSince(r['date']) > ARCHIVE_AFTER_DAYS;
+}
+
+// Estado "visible" en el dashboard: igual al Estado real del Sheet, salvo que
+// sea un "Nuevo" olvidado hace más de ARCHIVE_AFTER_DAYS días, en cuyo caso
+// se agrupa aparte como "Archivado" (esto es solo de vista, no toca el Sheet).
+function effectiveEstado(r) {
+  return isArchived(r) ? 'Archivado' : (r['Estado'] || 'Nuevo');
+}
+
+function sortByDate(rows) {
+  const copy = rows.slice();
+  copy.sort((a, b) => {
+    const da = new Date(a['date']), db = new Date(b['date']);
+    const diff = da - db;
+    return state.sortOrder === 'desc' ? -diff : diff;
+  });
+  return copy;
+}
+
+function monthLabel(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return 'Sin fecha';
+  const label = d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function monthKey(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '0000-00';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function isOverdue(dateStr) {
@@ -422,7 +477,7 @@ function matchesFilters(r) {
     const key = r['Correo electrónico'] || r['_row'];
     return state.highlightEmails.has(key);
   }
-  if (state.filteredEstado && r['Estado'] !== state.filteredEstado) return false;
+  if (state.filteredEstado && effectiveEstado(r) !== state.filteredEstado) return false;
   if (state.searchTerm) {
     const haystack = [r['Nombre'], r['Empresa'], r['Motivo consulta']].join(' ').toLowerCase();
     if (!haystack.includes(state.searchTerm)) return false;
@@ -434,8 +489,10 @@ function renderCrmAccordion() {
   const container = document.getElementById('crmAccordion');
   container.innerHTML = '';
 
-  ESTADOS.forEach(estado => {
-    const group = state.rows.filter(r => (r['Estado'] || 'Nuevo') === estado).filter(matchesFilters);
+  const displayGroups = ESTADOS.concat(['Archivado']);
+
+  displayGroups.forEach(estado => {
+    const group = sortByDate(state.rows.filter(r => effectiveEstado(r) === estado).filter(matchesFilters));
     if (group.length === 0 && state.filteredEstado && state.filteredEstado !== estado) return;
 
     const groupEl = document.createElement('div');
@@ -456,6 +513,13 @@ function renderCrmAccordion() {
 
     if (group.length === 0) {
       body.innerHTML = '<p class="view-intro" style="padding:14px 18px;">Sin leads en este estado.</p>';
+    } else if (estado === 'Archivado') {
+      const note = document.createElement('p');
+      note.className = 'view-intro';
+      note.style.padding = '14px 18px 0';
+      note.textContent = `Archivado: leads que llevan más de ${ARCHIVE_AFTER_DAYS} días marcados como "Nuevo" sin haber sido contactados.`;
+      body.appendChild(note);
+      body.appendChild(renderArchivedByMonth(group));
     } else {
       group.forEach(r => body.appendChild(renderLeadRow(r)));
     }
@@ -464,6 +528,46 @@ function renderCrmAccordion() {
     groupEl.appendChild(body);
     container.appendChild(groupEl);
   });
+}
+
+function renderArchivedByMonth(rows) {
+  const wrap = document.createElement('div');
+  wrap.className = 'archive-months';
+
+  const byMonth = {};
+  rows.forEach(r => {
+    const key = monthKey(r['date']);
+    if (!byMonth[key]) byMonth[key] = [];
+    byMonth[key].push(r);
+  });
+
+  const keys = Object.keys(byMonth).sort((a, b) => state.sortOrder === 'desc' ? (a < b ? 1 : -1) : (a > b ? 1 : -1));
+
+  keys.forEach(key => {
+    const monthRows = byMonth[key];
+    const monthEl = document.createElement('div');
+    monthEl.className = 'accordion-group month-group';
+    if (state.openArchiveMonths.has(key)) monthEl.classList.add('open');
+
+    const header = document.createElement('div');
+    header.className = 'accordion-header';
+    header.innerHTML = `<span>${monthLabel(monthRows[0]['date'])}</span><span class="count">${monthRows.length} lead${monthRows.length === 1 ? '' : 's'}<span class="chev">▸</span></span>`;
+    header.addEventListener('click', () => {
+      monthEl.classList.toggle('open');
+      if (monthEl.classList.contains('open')) state.openArchiveMonths.add(key);
+      else state.openArchiveMonths.delete(key);
+    });
+
+    const body = document.createElement('div');
+    body.className = 'accordion-body';
+    monthRows.forEach(r => body.appendChild(renderLeadRow(r)));
+
+    monthEl.appendChild(header);
+    monthEl.appendChild(body);
+    wrap.appendChild(monthEl);
+  });
+
+  return wrap;
 }
 
 function renderLeadRow(r) {
