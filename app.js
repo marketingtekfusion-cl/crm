@@ -23,6 +23,7 @@ const state = {
   highlightEmails: null, // set de emails a mostrar en exclusiva (venidos del aviso de leads nuevos)
   sortOrder: 'asc', // 'asc' = más antiguo primero, 'desc' = más nuevo primero
   openArchiveMonths: new Set(),
+  undoStack: [],
   resumenRange: { type: 'todos', from: null, to: null }
 };
 
@@ -125,8 +126,8 @@ function getResumenRows() {
   now.setHours(23, 59, 59, 999);
 
   if (range.type === 'custom') {
-    from = range.from ? new Date(range.from) : null;
-    to = range.to ? new Date(range.to + 'T23:59:59') : now;
+    from = range.from ? parseDate(range.from) : null;
+    to = range.to ? endOfDay(parseDate(range.to)) : now;
   } else {
     const days = Number(range.type);
     from = new Date();
@@ -136,7 +137,7 @@ function getResumenRows() {
   }
 
   return state.rows.filter(r => {
-    const d = new Date(r['date']);
+    const d = parseDate(r['date']);
     if (isNaN(d)) return false;
     if (from && d < from) return false;
     if (to && d > to) return false;
@@ -248,8 +249,29 @@ function bucketProducto(motivo) {
   return 'Otros';
 }
 
+// Convierte valores de fecha de forma segura. Un string "YYYY-MM-DD" (como los
+// que entrega un <input type="date">) JavaScript lo interpreta por defecto como
+// medianoche UTC, lo que en Chile (UTC-3/-4) lo corre un día hacia atrás al
+// mostrarlo. Acá lo forzamos a interpretarse en hora LOCAL para evitar ese
+// desfase. Cualquier otro formato (fecha+hora ISO, objetos Date, etc.) sigue
+// el comportamiento normal de JS.
+function parseDate(value) {
+  if (!value) return new Date(NaN);
+  if (typeof value === 'string') {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  return new Date(value);
+}
+
+function endOfDay(d) {
+  const e = new Date(d);
+  e.setHours(23, 59, 59, 999);
+  return e;
+}
+
 function daysSince(dateStr) {
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   if (isNaN(d)) return 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -271,7 +293,7 @@ function effectiveEstado(r) {
 function sortByDate(rows) {
   const copy = rows.slice();
   copy.sort((a, b) => {
-    const da = new Date(a['date']), db = new Date(b['date']);
+    const da = parseDate(a['date']), db = parseDate(b['date']);
     const diff = da - db;
     return state.sortOrder === 'desc' ? -diff : diff;
   });
@@ -279,21 +301,21 @@ function sortByDate(rows) {
 }
 
 function monthLabel(dateStr) {
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   if (isNaN(d)) return 'Sin fecha';
   const label = d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function monthKey(dateStr) {
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   if (isNaN(d)) return '0000-00';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function isOverdue(dateStr) {
   if (!dateStr) return false;
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return d < today;
@@ -301,14 +323,14 @@ function isOverdue(dateStr) {
 
 function fmtDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   if (isNaN(d)) return String(dateStr);
   return d.toLocaleDateString('es-CL');
 }
 
 function toDateInputValue(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   if (isNaN(d)) return '';
   return d.toISOString().slice(0, 10);
 }
@@ -322,7 +344,7 @@ function renderKPIs() {
 
   const now = new Date();
   const esteMes = rows.filter(r => {
-    const d = new Date(r['date']);
+    const d = parseDate(r['date']);
     return !isNaN(d) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }).length;
 
@@ -416,7 +438,7 @@ function renderTendenciaChart() {
   const rows = getResumenRows();
   const weekMap = {};
   rows.forEach(r => {
-    const d = new Date(r['date']);
+    const d = parseDate(r['date']);
     if (isNaN(d)) return;
     const weekStart = new Date(d);
     weekStart.setDate(d.getDate() - d.getDay());
@@ -655,7 +677,7 @@ function renderProximos() {
     .slice()
     .filter(r => r['Fecha próximo contacto'])
     .filter(r => r['Estado'] !== 'Ganado' && r['Estado'] !== 'Perdido')
-    .sort((a, b) => new Date(a['Fecha próximo contacto']) - new Date(b['Fecha próximo contacto']));
+    .sort((a, b) => parseDate(a['Fecha próximo contacto']) - parseDate(b['Fecha próximo contacto']));
 
   if (rows.length === 0) {
     container.innerHTML = '<p class="view-intro">No hay contactos agendados todavía.</p>';
@@ -789,6 +811,23 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.textContent = '↻ Actualizar';
   });
 
+  document.getElementById('undoBtn').addEventListener('click', async () => {
+    const action = state.undoStack.pop();
+    if (!action) return;
+    updateUndoButton();
+    const ok = await saveField(action.row, action.field, action.oldValue, null, false);
+    if (ok) {
+      safeRender(renderKPIs);
+      safeRender(renderCrmAccordion);
+      safeRender(renderProximos);
+      safeRender(renderInforme);
+    } else {
+      // si falló, lo devolvemos a la pila para no perder el registro
+      state.undoStack.push(action);
+      updateUndoButton();
+    }
+  });
+
   document.getElementById('modalSave').addEventListener('click', async () => {
     if (!modalRow) return;
     const status = document.getElementById('modalStatus');
@@ -815,7 +854,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 // GUARDAR CAMBIO — POST al Apps Script
 // ============================================================
-async function saveField(row, field, value, rowEl) {
+async function saveField(row, field, value, rowEl, recordUndo = true) {
+  const oldValue = row[field] || '';
   try {
     const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
@@ -833,10 +873,21 @@ async function saveField(row, field, value, rowEl) {
       if (rowEl) rowEl.style.outline = '2px solid #B3261E';
       if (data.error === 'row_changed') {
         alert('Esta fila cambió en el Sheet desde que se cargó el dashboard. Recarga la página antes de seguir editando.');
+      } else if (data.error === 'column_not_found') {
+        alert(`No se pudo guardar "${field}": esa columna todavía no existe en el Sheet. Agrégala con ese nombre exacto y vuelve a intentar.`);
+      } else if (data.error === 'unauthorized') {
+        alert('No se pudo guardar: la clave de escritura no coincide entre el dashboard y Apps Script (WRITE_TOKEN).');
+      } else {
+        alert(`No se pudo guardar "${field}". Error: ${data.error || 'desconocido'}`);
       }
       return false;
     }
     row[field] = value; // reflejar en memoria
+    if (recordUndo && oldValue !== value) {
+      state.undoStack.push({ row, field, oldValue, newValue: value });
+      if (state.undoStack.length > 20) state.undoStack.shift();
+      updateUndoButton();
+    }
     if (field === 'Estado') {
       safeRender(renderKPIs);
       safeRender(renderCrmAccordion);
@@ -851,6 +902,15 @@ async function saveField(row, field, value, rowEl) {
   } catch (err) {
     console.error(err);
     if (rowEl) rowEl.style.outline = '2px solid #B3261E';
+    alert(`No se pudo guardar "${field}": problema de conexión. Revisa tu internet e intenta de nuevo.`);
     return false;
   }
+}
+
+function updateUndoButton() {
+  const btn = document.getElementById('undoBtn');
+  if (!btn) return;
+  const last = state.undoStack[state.undoStack.length - 1];
+  btn.disabled = !last;
+  btn.title = last ? `Deshacer: ${last.field} de ${last.row['Nombre'] || 'lead'} (${last.oldValue || 'vacío'} → ${last.newValue || 'vacío'})` : 'Nada que deshacer';
 }
