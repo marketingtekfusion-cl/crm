@@ -13,7 +13,7 @@
   <!-- ============ PANTALLA DE CLAVE ============ -->
   <div id="lockScreen" class="lock-screen">
     <div class="lock-card">
-      <div class="lock-mark">TF</div>
+      <img src="tekfusion-logo.png" alt="Tekfusion" class="lock-logo">
       <h1>CRM Tekfusion</h1>
       <p class="lock-sub">Tuberías HDPE · Válvulas ASAHI · Geoceldas</p>
       <input id="lockInput" type="password" placeholder="Clave de acceso" autocomplete="off">
@@ -27,19 +27,22 @@
 
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark">TF</span>
+        <img src="tekfusion-logo.png" alt="Tekfusion" class="brand-logo" id="brandMark">
         <div>
           <div class="brand-name">CRM Tekfusion</div>
           <div class="brand-sub" id="lastUpdated">—</div>
         </div>
       </div>
-      <nav class="tabs" id="tabs">
-        <button class="tab-btn active" data-view="resumen">Resumen</button>
-        <button class="tab-btn" data-view="crm">CRM</button>
-        <button class="tab-btn" data-view="proximos">Próximos contactos</button>
-        <button class="tab-btn" data-view="tipos">Tipo y estado</button>
-        <button class="tab-btn" data-view="informes">Informes</button>
-      </nav>
+      <div class="topbar-right">
+        <button id="refreshBtn" class="btn-refresh" type="button">↻ Actualizar</button>
+        <nav class="tabs" id="tabs">
+          <button class="tab-btn active" data-view="resumen">Resumen</button>
+          <button class="tab-btn" data-view="crm">CRM</button>
+          <button class="tab-btn" data-view="proximos">Próximos contactos</button>
+          <button class="tab-btn" data-view="tipos">Tipo y estado</button>
+          <button class="tab-btn" data-view="informes">Informes</button>
+        </nav>
+      </div>
     </header>
 
     <!-- KPIs — siempre visibles -->
