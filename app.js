@@ -9,12 +9,14 @@ const CONFIG = {
 };
 
 const ESTADOS = ['Nuevo', 'Contactado', 'Cotizado', 'Ganado', 'Perdido'];
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
 const state = {
   rows: [],
   filteredEstado: '',
   searchTerm: '',
-  charts: {}
+  charts: {},
+  knownEmails: new Set() // para detectar leads nuevos entre refrescos
 };
 
 // ============================================================
@@ -75,21 +77,38 @@ function initNav() {
 }
 
 // ============================================================
-// BOOT
+// BOOT + AUTO-REFRESH (cada 5 min mientras el dashboard está abierto)
 // ============================================================
 async function boot() {
+  await loadData({ isFirstLoad: true });
+  renderAll();
+  setInterval(() => loadData({ isFirstLoad: false }).then(renderAll), REFRESH_INTERVAL_MS);
+}
+
+async function loadData({ isFirstLoad }) {
   try {
     const res = await fetch(CONFIG.APPS_SCRIPT_URL);
     const data = await res.json();
     if (!data.ok) throw new Error('Respuesta inválida del backend');
+
+    if (!isFirstLoad) {
+      const previousEmails = state.knownEmails;
+      const incomingEmails = new Set(data.rows.map(r => r['Correo electrónico'] || r['_row']));
+      const newCount = data.rows.filter(r => !previousEmails.has(r['Correo electrónico'] || r['_row'])).length;
+      if (newCount > 0) showNewLeadsBanner(newCount);
+    }
+
     state.rows = data.rows;
+    state.knownEmails = new Set(data.rows.map(r => r['Correo electrónico'] || r['_row']));
     document.getElementById('lastUpdated').textContent =
       'Actualizado ' + new Date(data.generatedAt).toLocaleString('es-CL');
   } catch (err) {
     document.getElementById('lastUpdated').textContent = 'Error al cargar datos';
     console.error(err);
   }
+}
 
+function renderAll() {
   safeRender(renderKPIs);
   safeRender(renderPipelineChart);
   safeRender(renderProductoChart);
@@ -97,6 +116,15 @@ async function boot() {
   safeRender(renderCrmAccordion);
   safeRender(renderProximos);
   safeRender(renderInforme);
+}
+
+function showNewLeadsBanner(count) {
+  const banner = document.getElementById('newLeadsBanner');
+  const text = document.getElementById('newLeadsText');
+  text.textContent = count === 1
+    ? '📥 Llegó 1 lead nuevo desde que abriste el dashboard.'
+    : `📥 Llegaron ${count} leads nuevos desde que abriste el dashboard.`;
+  banner.style.display = 'flex';
 }
 
 function safeRender(fn) {
@@ -253,9 +281,16 @@ function matchesFilters(r) {
   return true;
 }
 
+function listHeaderHtml() {
+  return `<div class="list-header">
+    <span>Contacto</span><span>Motivo consulta</span><span>Ingresó</span>
+    <span>Estado</span><span>Próximo contacto</span><span></span>
+  </div>`;
+}
+
 function renderCrmAccordion() {
   const container = document.getElementById('crmAccordion');
-  container.innerHTML = '';
+  container.innerHTML = listHeaderHtml();
 
   ESTADOS.forEach(estado => {
     const group = state.rows.filter(r => (r['Estado'] || 'Nuevo') === estado).filter(matchesFilters);
@@ -302,6 +337,7 @@ function renderLeadRow(r) {
   const dateInput = document.createElement('input');
   dateInput.type = 'date';
   dateInput.value = toDateInputValue(r['Fecha próximo contacto']);
+  dateInput.title = 'Próxima vez que hay que contactar a este lead';
   dateInput.addEventListener('change', () => {
     saveField(r, 'Fecha próximo contacto', dateInput.value, row);
   });
@@ -314,11 +350,12 @@ function renderLeadRow(r) {
   row.innerHTML = `
     <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}</div></div>
     <div>${escapeHtml((r['Motivo consulta'] || '').slice(0, 60))}${(r['Motivo consulta'] || '').length > 60 ? '…' : ''}</div>
-    <div></div>
-    <div></div>
+    <div class="fecha-ingreso">${fmtDate(r['date'])}</div>
+    <div><span class="cell-label">Estado</span></div>
+    <div><span class="cell-label">Próximo contacto</span></div>
   `;
-  row.children[2].appendChild(estadoSelect);
-  row.children[3].appendChild(dateInput);
+  row.children[3].appendChild(estadoSelect);
+  row.children[4].appendChild(dateInput);
   row.appendChild(detailBtn);
 
   return row;
@@ -336,6 +373,7 @@ function renderProximos() {
   container.innerHTML = '';
 
   const rows = state.rows
+    .slice()
     .filter(r => r['Fecha próximo contacto'])
     .filter(r => r['Estado'] !== 'Ganado' && r['Estado'] !== 'Perdido')
     .sort((a, b) => new Date(a['Fecha próximo contacto']) - new Date(b['Fecha próximo contacto']));
@@ -345,9 +383,16 @@ function renderProximos() {
     return;
   }
 
+  const headerEl = document.createElement('div');
+  headerEl.className = 'list-header';
+  headerEl.style.gridTemplateColumns = '1.3fr 1.2fr 1fr 1fr auto';
+  headerEl.innerHTML = '<span>Contacto</span><span>Motivo consulta</span><span>Próximo contacto</span><span>Estado</span><span></span>';
+  container.appendChild(headerEl);
+
   rows.forEach(r => {
     const row = document.createElement('div');
     row.className = 'lead-row';
+    row.style.gridTemplateColumns = '1.3fr 1.2fr 1fr 1fr auto';
     const overdue = isOverdue(r['Fecha próximo contacto']);
     row.innerHTML = `
       <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}</div></div>
@@ -389,6 +434,7 @@ function renderInforme() {
 // ============================================================
 let modalRow = null;
 const MODAL_FIELDS = [
+  { key: 'date', label: 'Fecha de ingreso', editable: false, formatDate: true },
   { key: 'Nombre', editable: true },
   { key: 'Empresa', editable: true },
   { key: 'Correo electrónico', editable: true },
@@ -408,9 +454,9 @@ function openModal(row) {
     const wrap = document.createElement('div');
     wrap.className = 'field-row' + (f.editable ? '' : ' readonly');
     const label = document.createElement('label');
-    label.textContent = f.key;
+    label.textContent = f.label || f.key;
     const input = document.createElement(f.textarea ? 'textarea' : 'input');
-    input.value = row[f.key] || '';
+    input.value = f.formatDate ? fmtDate(row[f.key]) : (row[f.key] || '');
     input.dataset.field = f.key;
     if (!f.editable) input.readOnly = true;
     wrap.appendChild(label);
@@ -430,6 +476,10 @@ function closeModal() {
 document.addEventListener('DOMContentLoaded', () => {
   initLock();
   initNav();
+
+  document.getElementById('newLeadsDismiss').addEventListener('click', () => {
+    document.getElementById('newLeadsBanner').style.display = 'none';
+  });
 
   document.getElementById('modalSave').addEventListener('click', async () => {
     if (!modalRow) return;
