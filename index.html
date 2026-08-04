@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Tekfusion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ PANTALLA DE CLAVE ============ -->
+  <div id="lockScreen" class="lock-screen">
+    <div class="lock-card">
+      <div class="lock-mark">TF</div>
+      <h1>CRM Tekfusion</h1>
+      <p class="lock-sub">Tuberías HDPE · Válvulas ASAHI · Geoceldas</p>
+      <input id="lockInput" type="password" placeholder="Clave de acceso" autocomplete="off">
+      <button id="lockBtn" type="button">Entrar</button>
+      <p id="lockError" class="lock-error">Clave incorrecta</p>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div id="app" class="app">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">TF</span>
+        <div>
+          <div class="brand-name">CRM Tekfusion</div>
+          <div class="brand-sub" id="lastUpdated">—</div>
+        </div>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab-btn active" data-view="resumen">Resumen</button>
+        <button class="tab-btn" data-view="crm">CRM</button>
+        <button class="tab-btn" data-view="proximos">Próximos contactos</button>
+        <button class="tab-btn" data-view="tipos">Tipo y estado</button>
+        <button class="tab-btn" data-view="informes">Informes</button>
+      </nav>
+    </header>
+
+    <!-- KPIs — siempre visibles -->
+    <section class="kpi-bar" id="kpiBar">
+      <div class="kpi-card">
+        <span class="kpi-label">Leads totales</span>
+        <span class="kpi-value" id="kpiTotal">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Leads este mes</span>
+        <span class="kpi-value" id="kpiMes">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Tasa de cierre</span>
+        <span class="kpi-value" id="kpiCierre">—</span>
+      </div>
+      <div class="kpi-card kpi-alert">
+        <span class="kpi-label">Contactos vencidos</span>
+        <span class="kpi-value" id="kpiVencidos">—</span>
+      </div>
+    </section>
+
+    <main class="views">
+
+      <!-- ============ RESUMEN ============ -->
+      <section id="view-resumen" class="view active">
+        <div class="grid-2">
+          <div class="panel">
+            <h2>Pipeline por etapa</h2>
+            <canvas id="chartPipeline" height="220"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Mix por producto</h2>
+            <canvas id="chartProducto" height="220"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Leads por semana</h2>
+          <canvas id="chartTendencia" height="140"></canvas>
+        </div>
+      </section>
+
+      <!-- ============ CRM (editable) ============ -->
+      <section id="view-crm" class="view">
+        <div class="toolbar">
+          <input id="crmSearch" type="text" placeholder="Buscar por nombre, empresa o motivo…">
+          <select id="crmFilterEstado">
+            <option value="">Todos los estados</option>
+            <option value="Nuevo">Nuevo</option>
+            <option value="Contactado">Contactado</option>
+            <option value="Cotizado">Cotizado</option>
+            <option value="Ganado">Ganado</option>
+            <option value="Perdido">Perdido</option>
+          </select>
+        </div>
+        <div id="crmAccordion" class="accordion"></div>
+      </section>
+
+      <!-- ============ PRÓXIMOS CONTACTOS ============ -->
+      <section id="view-proximos" class="view">
+        <p class="view-intro">Leads con fecha de próximo contacto agendada. Los vencidos aparecen marcados.</p>
+        <div id="proximosList" class="lead-list"></div>
+      </section>
+
+      <!-- ============ TIPO Y ESTADO ============ -->
+      <section id="view-tipos" class="view">
+        <div class="panel glossary">
+          <h2>¿Qué significa cada estado?</h2>
+          <dl>
+            <dt>Nuevo</dt><dd>Lead recién ingresado, sin contacto todavía.</dd>
+            <dt>Contactado</dt><dd>Ya se estableció contacto con el cliente, sin cotización enviada.</dd>
+            <dt>Cotizado</dt><dd>Se envió una cotización formal y está pendiente de respuesta.</dd>
+            <dt>Ganado</dt><dd>Negocio cerrado y confirmado.</dd>
+            <dt>Perdido</dt><dd>El negocio no se concretó. Revisa "Motivo pérdida" y "Detalle pérdida" para el detalle.</dd>
+          </dl>
+        </div>
+      </section>
+
+      <!-- ============ INFORMES ============ -->
+      <section id="view-informes" class="view">
+        <div class="panel" id="informePanel">
+          <h2>Informe de pipeline</h2>
+          <p class="view-intro">Vista lista para imprimir o exportar a PDF.</p>
+          <button id="printBtn" class="btn-primary no-print">Imprimir / Exportar PDF</button>
+          <div id="informeContent"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============ MODAL DETALLE / EDICIÓN ============ -->
+  <div id="detailModal" class="modal">
+    <div class="modal-card">
+      <button id="modalClose" class="modal-close">×</button>
+      <h2>Detalle del lead</h2>
+      <div id="modalBody"></div>
+      <div class="modal-actions">
+        <span id="modalStatus" class="modal-status"></span>
+        <button id="modalSave" class="btn-primary">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="chart.umd.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
