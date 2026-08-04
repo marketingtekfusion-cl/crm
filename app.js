@@ -18,6 +18,7 @@ const state = {
   searchTerm: '',
   charts: {},
   knownEmails: new Set(), // para detectar leads nuevos entre refrescos
+  openGroups: new Set(), // qué grupos del acordeón del CRM están expandidos
   resumenRange: { type: 'todos', from: null, to: null }
 };
 
@@ -401,11 +402,16 @@ function renderCrmAccordion() {
 
     const groupEl = document.createElement('div');
     groupEl.className = 'accordion-group';
+    if (state.openGroups.has(estado)) groupEl.classList.add('open');
 
     const header = document.createElement('div');
     header.className = 'accordion-header';
     header.innerHTML = `<span><span class="badge badge-${estado}">${estado}</span></span><span class="count">${group.length} lead${group.length === 1 ? '' : 's'}<span class="chev">▸</span></span>`;
-    header.addEventListener('click', () => groupEl.classList.toggle('open'));
+    header.addEventListener('click', () => {
+      groupEl.classList.toggle('open');
+      if (groupEl.classList.contains('open')) state.openGroups.add(estado);
+      else state.openGroups.delete(estado);
+    });
 
     const body = document.createElement('div');
     body.className = 'accordion-body';
@@ -621,6 +627,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('newLeadsBanner').style.display = 'none';
   });
 
+  document.getElementById('refreshBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true;
+    btn.textContent = '↻ Actualizando…';
+    await loadData({ isFirstLoad: false });
+    renderAll();
+    btn.disabled = false;
+    btn.textContent = '↻ Actualizar';
+  });
+
   document.getElementById('modalSave').addEventListener('click', async () => {
     if (!modalRow) return;
     const status = document.getElementById('modalStatus');
@@ -669,7 +685,16 @@ async function saveField(row, field, value, rowEl) {
       return false;
     }
     row[field] = value; // reflejar en memoria
-    if (field === 'Estado') safeRender(renderKPIs);
+    if (field === 'Estado') {
+      safeRender(renderKPIs);
+      safeRender(renderCrmAccordion);
+      safeRender(renderProximos);
+      safeRender(renderInforme);
+    }
+    if (field === 'Fecha próximo contacto') {
+      safeRender(renderKPIs);
+      safeRender(renderProximos);
+    }
     return true;
   } catch (err) {
     console.error(err);
