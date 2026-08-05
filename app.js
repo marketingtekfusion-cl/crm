@@ -13,6 +13,20 @@ const RESPONSABLES = ['Anita', 'Tere', 'Cristián', 'Alejandro', 'Ricardo', 'Igo
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 const ARCHIVE_AFTER_DAYS = 14; // días como "Nuevo" sin contactar antes de archivarse
 
+// Google Apps Script a veces corta la conexión a medio camino bajo carga
+// (varias pestañas del equipo consultando a la vez). Antes de mostrarle un
+// error al usuario, reintentamos un par de veces en silencio.
+async function fetchWithRetry(url, options, retries = 2, delayMs = 700) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise(res => setTimeout(res, delayMs * (attempt + 1)));
+    }
+  }
+}
+
 const state = {
   rows: [],
   filteredEstado: '',
@@ -209,12 +223,15 @@ function getResumenRows() {
 async function boot() {
   await loadData({ isFirstLoad: true });
   renderAll();
-  setInterval(() => loadData({ isFirstLoad: false }).then(renderAll), REFRESH_INTERVAL_MS);
+  setInterval(() => {
+    if (document.hidden) return; // pestaña de fondo: no gastamos cuota de Apps Script sin necesidad
+    loadData({ isFirstLoad: false }).then(renderAll);
+  }, REFRESH_INTERVAL_MS);
 }
 
 async function loadData({ isFirstLoad }) {
   try {
-    const res = await fetch(CONFIG.APPS_SCRIPT_URL);
+    const res = await fetchWithRetry(CONFIG.APPS_SCRIPT_URL);
     const data = await res.json();
     if (!data.ok) throw new Error('Respuesta inválida del backend');
 
@@ -986,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function saveField(row, field, value, rowEl, recordUndo = true) {
   const oldValue = row[field] || '';
   try {
-    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    const res = await fetchWithRetry(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify({
         token: CONFIG.WRITE_TOKEN,
