@@ -1003,16 +1003,15 @@ document.addEventListener('DOMContentLoaded', () => {
 async function saveField(row, field, value, rowEl, recordUndo = true) {
   const oldValue = row[field] || '';
   try {
-    const res = await fetchWithRetry(CONFIG.APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        token: CONFIG.WRITE_TOKEN,
-        row: row._row,
-        field: field,
-        value: value,
-        expectedEmail: row['Correo electrónico']
-      })
+    const params = new URLSearchParams({
+      action: 'write',
+      token: CONFIG.WRITE_TOKEN,
+      row: row._row,
+      field: field,
+      value: value,
+      expectedEmail: row['Correo electrónico'] || ''
     });
+    const res = await fetchWithRetry(`${CONFIG.APPS_SCRIPT_URL}?${params.toString()}`);
     const data = await res.json();
     if (!data.ok) {
       console.error('Error al guardar', data.error);
