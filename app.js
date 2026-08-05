@@ -24,6 +24,7 @@ const state = {
   sortOrder: 'asc', // 'asc' = más antiguo primero, 'desc' = más nuevo primero
   openArchiveMonths: new Set(),
   undoStack: [],
+  currentUser: null,
   resumenRange: { type: 'todos', from: null, to: null }
 };
 
@@ -33,7 +34,6 @@ const state = {
 // ============================================================
 function initLock() {
   const lockScreen = document.getElementById('lockScreen');
-  const app = document.getElementById('app');
   const input = document.getElementById('lockInput');
   const btn = document.getElementById('lockBtn');
   const error = document.getElementById('lockError');
@@ -43,8 +43,7 @@ function initLock() {
   function tryUnlock() {
     if (input.value === CONFIG.DASHBOARD_PASSWORD) {
       lockScreen.style.display = 'none';
-      app.style.display = 'block';
-      boot();
+      showIdentityScreenOrApp();
     } else {
       error.style.display = 'block';
     }
@@ -55,10 +54,69 @@ function initLock() {
 }
 
 // ============================================================
+// IDENTIDAD — "¿quién eres?" solo para personalizar Recordatorios.
+// No es seguridad real (la clave compartida ya cumple ese rol);
+// se guarda en sessionStorage, dura mientras el navegador esté abierto.
+// ============================================================
+function showIdentityScreenOrApp() {
+  const saved = sessionStorage.getItem('crmUser');
+  if (saved !== null) {
+    state.currentUser = saved || null; // '' guardado = "solo estoy mirando"
+    enterApp();
+    return;
+  }
+
+  const identityScreen = document.getElementById('identityScreen');
+  const options = document.getElementById('identityOptions');
+  options.innerHTML = '';
+  RESPONSABLES.forEach(name => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = name;
+    btn.addEventListener('click', () => {
+      sessionStorage.setItem('crmUser', name);
+      state.currentUser = name;
+      identityScreen.style.display = 'none';
+      enterApp();
+    });
+    options.appendChild(btn);
+  });
+  identityScreen.style.display = 'flex';
+
+  document.getElementById('identitySkip').addEventListener('click', () => {
+    sessionStorage.setItem('crmUser', '');
+    state.currentUser = null;
+    identityScreen.style.display = 'none';
+    enterApp();
+  });
+}
+
+function changeIdentity() {
+  sessionStorage.removeItem('crmUser');
+  document.getElementById('app').style.display = 'none';
+  showIdentityScreenOrApp();
+}
+
+function enterApp() {
+  document.getElementById('app').style.display = 'block';
+  updateUserBadge();
+  boot();
+}
+
+function updateUserBadge() {
+  const badge = document.getElementById('userBadge');
+  badge.style.display = 'inline-flex';
+  badge.textContent = state.currentUser ? `👤 ${state.currentUser} · cambiar` : '👀 Solo mirando · cambiar';
+}
+
+// ============================================================
 // NAV — activar botones ANTES de intentar dibujar nada, así
 // la navegación nunca queda bloqueada por un error de render.
 // ============================================================
 function initNav() {
+  document.getElementById('userBadge').addEventListener('click', changeIdentity);
+  document.getElementById('recordatoriosElegir').addEventListener('click', changeIdentity);
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -186,6 +244,7 @@ function renderAll() {
   safeRender(renderLineaEstadoChart);
   safeRender(renderCrmAccordion);
   safeRender(renderProximos);
+      safeRender(renderRecordatorios);
   safeRender(renderInforme);
 }
 
@@ -681,6 +740,24 @@ function escapeHtml(str) {
 // ============================================================
 // PRÓXIMOS CONTACTOS
 // ============================================================
+function buildSimpleRow(r) {
+  const row = document.createElement('div');
+  row.className = 'simple-row';
+  const overdue = isOverdue(r['Fecha próximo contacto']);
+  row.innerHTML = `
+    <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}${r['Responsable'] ? ' · <span class="responsable">' + escapeHtml(r['Responsable']) + '</span>' : ''}</div></div>
+    <div>${escapeHtml((r['Motivo consulta'] || '').slice(0, 60))}</div>
+    <div class="${overdue ? 'overdue' : ''}">${overdue ? '⚠ Vencido: ' : ''}${fmtDate(r['Fecha próximo contacto'])}</div>
+    <div><span class="badge badge-${r['Estado'] || 'Nuevo'}">${r['Estado'] || 'Nuevo'}</span></div>
+  `;
+  const btn = document.createElement('button');
+  btn.className = 'btn-detail';
+  btn.textContent = 'Ver detalle';
+  btn.addEventListener('click', () => openModal(r));
+  row.appendChild(btn);
+  return row;
+}
+
 function renderProximos() {
   const container = document.getElementById('proximosList');
   container.innerHTML = '';
@@ -701,23 +778,60 @@ function renderProximos() {
   headerEl.innerHTML = '<span>Contacto</span><span>Motivo consulta</span><span>Próximo contacto</span><span>Estado</span><span></span>';
   container.appendChild(headerEl);
 
-  rows.forEach(r => {
-    const row = document.createElement('div');
-    row.className = 'simple-row';
-    const overdue = isOverdue(r['Fecha próximo contacto']);
-    row.innerHTML = `
-      <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}${r['Responsable'] ? ' · <span class="responsable">' + escapeHtml(r['Responsable']) + '</span>' : ''}</div></div>
-      <div>${escapeHtml((r['Motivo consulta'] || '').slice(0, 60))}</div>
-      <div class="${overdue ? 'overdue' : ''}">${overdue ? '⚠ Vencido: ' : ''}${fmtDate(r['Fecha próximo contacto'])}</div>
-      <div><span class="badge badge-${r['Estado'] || 'Nuevo'}">${r['Estado'] || 'Nuevo'}</span></div>
-    `;
-    const btn = document.createElement('button');
-    btn.className = 'btn-detail';
-    btn.textContent = 'Ver detalle';
-    btn.addEventListener('click', () => openModal(r));
-    row.appendChild(btn);
-    container.appendChild(row);
-  });
+  rows.forEach(r => container.appendChild(buildSimpleRow(r)));
+}
+
+function renderRecordatorios() {
+  const noUserPanel = document.getElementById('recordatoriosNoUser');
+  const content = document.getElementById('recordatoriosContent');
+  const intro = document.getElementById('recordatoriosIntro');
+  content.innerHTML = '';
+
+  if (!state.currentUser) {
+    noUserPanel.style.display = 'block';
+    intro.style.display = 'none';
+    return;
+  }
+  noUserPanel.style.display = 'none';
+  intro.style.display = 'block';
+  intro.textContent = `Leads asignados a ${state.currentUser} con fecha de próximo contacto agendada.`;
+
+  const rows = state.rows
+    .slice()
+    .filter(r => r['Responsable'] === state.currentUser)
+    .filter(r => r['Fecha próximo contacto'])
+    .filter(r => r['Estado'] !== 'Ganado' && r['Estado'] !== 'Perdido')
+    .sort((a, b) => parseDate(a['Fecha próximo contacto']) - parseDate(b['Fecha próximo contacto']));
+
+  if (rows.length === 0) {
+    content.innerHTML = '<p class="view-intro">No tienes recordatorios pendientes. 🎉</p>';
+    return;
+  }
+
+  const vencidos = rows.filter(r => isOverdue(r['Fecha próximo contacto']));
+  const proximos = rows.filter(r => !isOverdue(r['Fecha próximo contacto']));
+
+  if (vencidos.length > 0) {
+    const h = document.createElement('h2');
+    h.textContent = `Vencidos (${vencidos.length})`;
+    h.style.color = 'var(--danger)';
+    content.appendChild(h);
+    const list = document.createElement('div');
+    list.className = 'lead-list';
+    vencidos.forEach(r => list.appendChild(buildSimpleRow(r)));
+    content.appendChild(list);
+  }
+
+  if (proximos.length > 0) {
+    const h = document.createElement('h2');
+    h.textContent = `Próximos (${proximos.length})`;
+    h.style.marginTop = vencidos.length > 0 ? '20px' : '0';
+    content.appendChild(h);
+    const list = document.createElement('div');
+    list.className = 'lead-list';
+    proximos.forEach(r => list.appendChild(buildSimpleRow(r)));
+    content.appendChild(list);
+  }
 }
 
 // ============================================================
@@ -753,6 +867,7 @@ const MODAL_FIELDS = [
   { key: 'Teléfono', editable: true },
   { key: 'Motivo consulta', editable: false },
   { key: 'Comentario o mensaje', editable: false, textarea: true },
+  { key: 'Comentario - Seguimiento interno', label: 'Comentario · Seguimiento interno', editable: true, textarea: true },
   { key: 'Motivo pérdida (solo si corresponde)', editable: true },
   { key: 'Detalle pérdida', editable: true, textarea: true }
 ];
@@ -832,6 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
       safeRender(renderKPIs);
       safeRender(renderCrmAccordion);
       safeRender(renderProximos);
+      safeRender(renderRecordatorios);
       safeRender(renderInforme);
     } else {
       // si falló, lo devolvemos a la pila para no perder el registro
@@ -858,6 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (allOk) {
       safeRender(renderCrmAccordion);
       safeRender(renderProximos);
+      safeRender(renderRecordatorios);
       setTimeout(closeModal, 700);
     }
   });
@@ -906,17 +1023,19 @@ async function saveField(row, field, value, rowEl, recordUndo = true) {
       safeRender(renderKPIs);
       safeRender(renderCrmAccordion);
       safeRender(renderProximos);
+      safeRender(renderRecordatorios);
       safeRender(renderInforme);
     }
     if (field === 'Fecha próximo contacto') {
       safeRender(renderKPIs);
       safeRender(renderProximos);
+      safeRender(renderRecordatorios);
     }
     return true;
   } catch (err) {
     console.error(err);
     if (rowEl) rowEl.style.outline = '2px solid #B3261E';
-    alert(`No se pudo guardar "${field}": problema de conexión. Revisa tu internet e intenta de nuevo.`);
+    alert(`No se pudo guardar "${field}": problema de conexión. Revisa tu internet e intenta de nuevo.\n\nDetalle técnico (mándale una foto de esto a Tomás si se repite): ${err.message || err}`);
     return false;
   }
 }

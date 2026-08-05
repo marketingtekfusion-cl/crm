@@ -6,7 +6,7 @@
 <title>CRM Tekfusion</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -22,6 +22,17 @@
     </div>
   </div>
 
+  <!-- ============ PANTALLA "¿QUIÉN ERES?" ============ -->
+  <div id="identityScreen" class="lock-screen" style="display:none;">
+    <div class="lock-card identity-card">
+      <img src="tekfusion-logo.png" alt="Tekfusion" class="lock-logo">
+      <h1>¿Quién eres?</h1>
+      <p class="lock-sub">Para mostrarte tus propios recordatorios</p>
+      <div id="identityOptions" class="identity-grid"></div>
+      <button id="identitySkip" type="button" class="identity-skip">Solo estoy mirando</button>
+    </div>
+  </div>
+
   <!-- ============ APP ============ -->
   <div id="app" class="app">
 
@@ -34,11 +45,13 @@
         </div>
       </div>
       <div class="topbar-right">
+        <span id="userBadge" class="user-badge"></span>
         <button id="undoBtn" class="btn-refresh" type="button" disabled>↩ Deshacer</button>
         <button id="refreshBtn" class="btn-refresh" type="button">↻ Actualizar</button>
         <nav class="tabs" id="tabs">
           <button class="tab-btn active" data-view="resumen">Resumen</button>
           <button class="tab-btn" data-view="crm">CRM</button>
+          <button class="tab-btn" data-view="recordatorios">Recordatorios</button>
           <button class="tab-btn" data-view="proximos">Próximos contactos</button>
           <button class="tab-btn" data-view="tipos">Tipo y estado</button>
           <button class="tab-btn" data-view="informes">Informes</button>
@@ -129,6 +142,16 @@
         <div id="crmAccordion" class="accordion"></div>
       </section>
 
+      <!-- ============ RECORDATORIOS (personalizado por usuario) ============ -->
+      <section id="view-recordatorios" class="view">
+        <p class="view-intro" id="recordatoriosIntro">Tus leads con fecha de próximo contacto agendada.</p>
+        <div id="recordatoriosNoUser" class="panel" style="display:none;">
+          <p style="margin:0 0 12px;">Todavía no elegiste quién eres.</p>
+          <button id="recordatoriosElegir" class="btn-primary" type="button">Elegir mi nombre</button>
+        </div>
+        <div id="recordatoriosContent"></div>
+      </section>
+
       <!-- ============ PRÓXIMOS CONTACTOS ============ -->
       <section id="view-proximos" class="view">
         <p class="view-intro">Leads con fecha de próximo contacto agendada. Los vencidos aparecen marcados.</p>
@@ -177,6 +200,6 @@
   </div>
 
   <script src="chart.umd.js"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
