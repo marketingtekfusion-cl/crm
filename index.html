@@ -2,11 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRM Tekfusion</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.r15.css">
 </head>
 <body>
 
@@ -100,6 +103,24 @@
           <span id="resumenHastaLabel" style="display:none; align-self:center; font-size:13px; color:var(--muted);">hasta</span>
           <input id="resumenHasta" type="date" style="display:none;">
         </div>
+        <div class="kpi-bar resumen-kpi-bar">
+          <div class="kpi-card">
+            <span class="kpi-label">Leads en el período</span>
+            <span class="kpi-value" id="kpiPeriodoTotal">—</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Ganados en el período</span>
+            <span class="kpi-value" id="kpiPeriodoGanados">—</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Perdidos en el período</span>
+            <span class="kpi-value" id="kpiPeriodoPerdidos">—</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Tasa de cierre del período</span>
+            <span class="kpi-value" id="kpiPeriodoCierre">—</span>
+          </div>
+        </div>
         <div class="grid-2">
           <div class="panel">
             <h2>Pipeline por etapa</h2>
@@ -168,7 +189,7 @@
             <dt>Cotizado</dt><dd>Se envió una cotización formal y está pendiente de respuesta.</dd>
             <dt>Ganado</dt><dd>Negocio cerrado y confirmado.</dd>
             <dt>Perdido</dt><dd>El negocio no se concretó. Revisa "Motivo pérdida" y "Detalle pérdida" para el detalle.</dd>
-            <dt>Archivado</dt><dd>No es un estado que se elige — es automático. Agrupa los leads que llevan más de 14 días marcados como "Nuevo" sin que nadie los haya contactado. Apenas cambias su Estado a cualquier otra cosa, sale de "Archivado" solo.</dd>
+            <dt>Archivado</dt><dd>No es un estado que se elige — es automático. Agrupa los leads que llevan más de 14 días marcados como "Nuevo" sin que nadie los haya contactado. Para recuperar uno: cámbiale el Estado a cualquier otra cosa, o agéndale una fecha de "Próximo contacto" — cualquiera de las dos lo saca de "Archivado" solo.</dd>
           </dl>
         </div>
       </section>
@@ -200,6 +221,6 @@
   </div>
 
   <script src="chart.umd.js"></script>
-  <script src="app.js?v=13"></script>
+  <script src="app.r15.js"></script>
 </body>
 </html>
