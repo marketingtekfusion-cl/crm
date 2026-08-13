@@ -11,21 +11,8 @@ const CONFIG = {
 // Estos textos deben calzar EXACTO con la validación de datos de la columna
 // "Estado" en el Sheet — si alguna vez cambian ahí, hay que cambiarlos acá.
 const ESTADOS = ['Nuevo', 'Contactado', 'Cotizado', 'Ganado', 'Perdido'];
-
-// Los valores de Estado reales tienen espacios/guiones, que no sirven como
-// nombre de clase CSS. Este mapeo los traduce a una clave corta solo para
-// pintar badges/gráficos (nunca se usa para decidir qué se guarda).
-const ESTADO_COLOR_KEY = {
-  'Nuevo': 'Nuevo',
-  'Contactado': 'Contactado',
-  'Cotización enviada': 'Cotizado',
-  'Cerrado - Ganado': 'Ganado',
-  'Cerrado - Perdido': 'Perdido'
-};
-function estadoColorKey(estado) {
-  return ESTADO_COLOR_KEY[estado] || 'Nuevo';
-}
 const RESPONSABLES = ['Anita', 'Tere', 'Cristián', 'Alejandro', 'Ricardo', 'Igor'];
+const MOTIVOS_PERDIDA = ['Precio', 'Tiempo de respuesta', 'Otro (detallar)'];
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 const ARCHIVE_AFTER_DAYS = 14; // días como "Nuevo" sin contactar antes de archivarse
 
@@ -671,11 +658,16 @@ function renderCrmAccordion() {
 
     const header = document.createElement('div');
     header.className = 'accordion-header';
-    header.innerHTML = `<span><span class="badge badge-${estadoColorKey(estado)}">${estado}</span></span><span class="count">${group.length} lead${group.length === 1 ? '' : 's'}<span class="chev">▸</span></span>`;
+    header.innerHTML = `<span><span class="badge badge-${estado}">${estado}</span></span><span class="count">${group.length} lead${group.length === 1 ? '' : 's'}<span class="chev">▸</span></span>`;
     header.addEventListener('click', () => {
-      groupEl.classList.toggle('open');
-      if (groupEl.classList.contains('open')) state.openGroups.add(estado);
-      else state.openGroups.delete(estado);
+      const willOpen = !groupEl.classList.contains('open');
+      // exclusivo: cerrar todos los demás grupos del mismo nivel antes de abrir este
+      container.querySelectorAll(':scope > .accordion-group.open').forEach(el => {
+        if (el !== groupEl) el.classList.remove('open');
+      });
+      state.openGroups.clear();
+      groupEl.classList.toggle('open', willOpen);
+      if (willOpen) state.openGroups.add(estado);
     });
 
     const body = document.createElement('div');
@@ -723,9 +715,13 @@ function renderArchivedByMonth(rows) {
     header.className = 'accordion-header';
     header.innerHTML = `<span>${monthLabel(monthRows[0]['date'])}</span><span class="count">${monthRows.length} lead${monthRows.length === 1 ? '' : 's'}<span class="chev">▸</span></span>`;
     header.addEventListener('click', () => {
-      monthEl.classList.toggle('open');
-      if (monthEl.classList.contains('open')) state.openArchiveMonths.add(key);
-      else state.openArchiveMonths.delete(key);
+      const willOpen = !monthEl.classList.contains('open');
+      wrap.querySelectorAll(':scope > .accordion-group.open').forEach(el => {
+        if (el !== monthEl) el.classList.remove('open');
+      });
+      state.openArchiveMonths.clear();
+      monthEl.classList.toggle('open', willOpen);
+      if (willOpen) state.openArchiveMonths.add(key);
     });
 
     const body = document.createElement('div');
@@ -837,7 +833,7 @@ function buildSimpleRow(r) {
     <div><div class="name">${escapeHtml(r['Nombre'] || 'Sin nombre')}</div><div class="company">${escapeHtml(r['Empresa'] || '')}${r['Responsable'] ? ' · <span class="responsable">' + escapeHtml(r['Responsable']) + '</span>' : ''}</div></div>
     <div>${escapeHtml((r['Motivo consulta'] || '').slice(0, 60))}</div>
     <div class="${overdue ? 'overdue' : ''}">${overdue ? '⚠ Vencido: ' : ''}${fmtDate(r['Fecha próximo contacto'])}</div>
-    <div><span class="badge badge-${estadoColorKey(r['Estado'] || 'Nuevo')}">${r['Estado'] || 'Nuevo'}</span></div>
+    <div><span class="badge badge-${r['Estado'] || 'Nuevo'}">${r['Estado'] || 'Nuevo'}</span></div>
   `;
   const btn = document.createElement('button');
   btn.className = 'btn-detail';
@@ -957,7 +953,7 @@ const MODAL_FIELDS = [
   { key: 'Motivo consulta', editable: false },
   { key: 'Comentario o mensaje', editable: false, textarea: true },
   { key: 'Comentario - Seguimiento interno', label: 'Comentario · Seguimiento interno', editable: true, textarea: true },
-  { key: 'Motivo pérdida (solo si corresponde)', editable: true },
+  { key: 'Motivo pérdida (solo si corresponde)', editable: true, select: MOTIVOS_PERDIDA },
   { key: 'Detalle pérdida', editable: true, textarea: true }
 ];
 
